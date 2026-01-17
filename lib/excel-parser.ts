@@ -2,113 +2,118 @@ import * as XLSX from 'xlsx';
 import Result from '@/models/Result';
 import dbConnect from '@/lib/mongodb';
 
-
-
 export async function parseAndSaveExcel(buffer: Buffer) {
   await dbConnect();
-  
+
   const workbook = XLSX.read(buffer, { type: 'buffer' });
   const sheetNames = workbook.SheetNames;
-  
+
   let totalProcessed = 0;
   const eventsProcessed: string[] = [];
-
   const GROUP_KEYWORDS = ["GROUP"];
 
   for (const sheetName of sheetNames) {
-      // Skip empty or utility sheets if any, though "101", "102" are valid
-      const worksheet = workbook.Sheets[sheetName];
-      const rows = XLSX.utils.sheet_to_json(worksheet, { header: 1, defval: '' }) as (string | number)[][];
+    const worksheet = workbook.Sheets[sheetName];
+    const rows = XLSX.utils.sheet_to_json(worksheet, { header: 1, defval: '' }) as (string | number)[][];
 
-      if (rows.length < 5) {
-          console.log(`Skipping sheet ${sheetName}: Too few rows`);
-          continue;
+    if (rows.length < 5) continue;
+
+    // --- 1. IMPROVED METADATA EXTRACTION ---
+    const eventRow = rows[2] || [];
+    const eventRaw = String(eventRow[0] || "");
+    const eventName = eventRaw.replace(/^EVENT\s*:\s*/i, '').trim();
+    if (!eventName) continue;
+
+    // Fixed Category logic: Don't just take the next cell if it's a number like "1"
+    let category = "General";
+    const catLabelIndex = eventRow.findIndex((c) => typeof c === 'string' && c.trim().toLowerCase().includes('category'));
+    if (catLabelIndex !== -1 && eventRow.length > catLabelIndex + 1) {
+      const catVal = String(eventRow[catLabelIndex + 1]).trim();
+      if (catVal.length > 1) category = catVal; // Only update if it's not a single digit
+    }
+
+    // --- 2. ADVANCED HEADER MAPPING ---
+    let headerRowIndex = -1;
+    let colMap = { name: 2, school: 4, grade: 5, place: 6 }; // Defaults based on your data structure
+
+    for (let i = 0; i < Math.min(rows.length, 10); i++) {
+      const rowStr = rows[i].map(c => String(c).toLowerCase().trim());
+      const nameIdx = rowStr.findIndex(c => c.includes('student') || c.includes('name'));
+      if (nameIdx !== -1) {
+        headerRowIndex = i;
+        colMap.name = nameIdx;
+        colMap.school = rowStr.findIndex(c => c.includes('school') || c.includes('institution'));
+        colMap.grade = rowStr.findIndex(c => c.includes('grade') || c.includes('mark') || c === '1');
+        colMap.place = rowStr.findIndex(c => c.includes('place') || c.includes('rank') || c.includes('pos'));
+        break;
       }
+    }
 
-      const eventRow = rows[2];
-      const codeRow = rows[3];
+    const isGroup = GROUP_KEYWORDS.some(k => eventName.toUpperCase().includes(k));
+    const resultsToSave = [];
+
+    // --- 3. ROW PROCESSING WITH NORMALIZATION ---
+    const dataStartIndex = headerRowIndex !== -1 ? headerRowIndex + 1 : 5;
+
+    for (let i = dataStartIndex; i < rows.length; i++) {
+      const row = rows[i];
+      if (!row || row.length < 3) continue;
+
+      const studentName = String(row[colMap.name] || '').trim();
+      if (!studentName || studentName.toLowerCase().includes('name of')) continue;
+
+      const school = String(row[colMap.school] || '').trim();
       
-      // Extract Event Name
-      const eventRaw = (eventRow[0] as string) || "";
-      const eventName = eventRaw.replace(/^EVENT\s*:\s*/i, '').trim();
+      // Normalize Grade (Handling "1" as A-Grade)
+      let rawGrade = String(row[colMap.grade] || '').trim().toUpperCase();
+      let grade = rawGrade;
+      if (grade === '1') grade = 'A'; 
 
-      if (!eventName) {
-         // Try to find event name in other cells of row 2?
-         // console.log(`Skipping sheet ${sheetName}: No event name found`);
-         // continue;
-         // Sometimes meta might be shifted. Let's strict for now.
-         continue; 
+      // Normalize Place (Handling "-seco", "-fir", "-i", "1", "2")
+      let rawPlace = String(row[colMap.place] || '').trim().toLowerCase().replace(/^-/, '');
+      let place = "";
+
+      if (rawPlace.includes('fir') || rawPlace === '1') place = 'First';
+      else if (rawPlace.includes('seco') || rawPlace === '2') place = 'Second';
+      else if (rawPlace.includes('thi') || rawPlace === '3') place = 'Third';
+      else if (rawPlace === 'i') { 
+          // In some sheets 'i' means First Place or A Grade
+          place = 'First'; 
+          grade = grade || 'A';
+      } else {
+          place = rawPlace.charAt(0).toUpperCase() + rawPlace.slice(1);
       }
 
-      // Extract Category
-      let category = "Unknown";
-      const catLabelIndex = eventRow.findIndex((c) => typeof c === 'string' && c.trim().toLowerCase() === 'category:');
-      if (catLabelIndex !== -1 && eventRow.length > catLabelIndex + 1) {
-          category = String(eventRow[catLabelIndex + 1]).trim();
-      }
+      // --- 4. POINT CALCULATION ---
+      let placePoints = 0;
+      let gradePoints = 0;
 
-      // Extract Event Code
-      const codeRaw = (codeRow[0] as string) || "";
-      let eventCode = codeRaw.replace(/^EVENT CODE\s*:\s*/i, '').trim();
-      // If code missing from cell, use sheet name if numeric?
-      if (!eventCode && /^\d+$/.test(sheetName)) {
-          eventCode = sheetName;
-      }
+      if (place === 'First') placePoints = isGroup ? 10 : 5;
+      else if (place === 'Second') placePoints = isGroup ? 6 : 3;
+      else if (place === 'Third') placePoints = isGroup ? 2 : 1;
 
-      // Auto-detect Group
-      const isGroup = GROUP_KEYWORDS.some(k => eventName.toUpperCase().includes(k));
+      if (grade === 'A') gradePoints = isGroup ? 10 : 5;
+      else if (grade === 'B') gradePoints = isGroup ? 6 : 3;
+      else if (grade === 'C') gradePoints = isGroup ? 2 : 1;
 
-      console.log(`Processing Sheet ${sheetName}: Event: ${eventName} (${eventCode}), Cat: ${category}, IsGroup: ${isGroup}`);
+      resultsToSave.push({
+        eventCode: sheetName,
+        eventName,
+        category,
+        studentName,
+        school,
+        grade: grade || 'A', // Fallback to A if place exists but grade is blank
+        place,
+        points: placePoints + gradePoints
+      });
+    }
 
-      const dataStartIndex = 5;
-      const resultsToSave = [];
-
-      for (let i = dataStartIndex; i < rows.length; i++) {
-        const row = rows[i];
-        if (!row || row.length === 0) continue;
-        
-        const studentName = String(row[2] || '').trim();
-        
-        if (!studentName) continue;
-
-        const school = String(row[4] || '').trim();
-        const grade = String(row[5] || '').trim().toUpperCase();
-        const place = String(row[6] || '').trim().toLowerCase().replace(/st|nd|rd|th/g, ''); 
-
-        let placePoints = 0;
-        let gradePoints = 0;
-
-        // Place Points
-        if (place === '1') placePoints = isGroup ? 10 : 5;
-        else if (place === '2') placePoints = isGroup ? 6 : 3;
-        else if (place === '3') placePoints = isGroup ? 2 : 1;
-
-        // Grade Points
-        if (grade === 'A') gradePoints = isGroup ? 10 : 5;
-        else if (grade === 'B') gradePoints = isGroup ? 6 : 3;
-        else if (grade === 'C') gradePoints = isGroup ? 2 : 1;
-
-        const totalPoints = placePoints + gradePoints;
-
-        resultsToSave.push({
-          eventCode: eventCode || "MISC", 
-          eventName,
-          category,
-          studentName,
-          school,
-          grade,
-          place: place === '1' ? 'First' : place === '2' ? 'Second' : place === '3' ? 'Third' : place, 
-          points: totalPoints
-        });
-      }
-
-      if (resultsToSave.length > 0) {
-          // Transaction-like replacement PER EVENT
-          await Result.deleteMany({ eventName, category }); 
-          await Result.insertMany(resultsToSave);
-          totalProcessed += resultsToSave.length;
-          eventsProcessed.push(eventName);
-      }
+    if (resultsToSave.length > 0) {
+      await Result.deleteMany({ eventName, category }); 
+      await Result.insertMany(resultsToSave);
+      totalProcessed += resultsToSave.length;
+      eventsProcessed.push(eventName);
+    }
   }
 
   return { success: true, count: totalProcessed, events: eventsProcessed };
