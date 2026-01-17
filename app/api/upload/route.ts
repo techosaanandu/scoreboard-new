@@ -1,16 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from "next-auth";
 import { parseAndSaveExcel } from '@/lib/excel-parser';
-import { GET as authOptions } from "@/app/api/auth/[...nextauth]/route"; 
-
-// Need to configure bodyParser to false for file upload? 
-// Next.js App Router handles requests differently. We read formData.
+import { authOptions } from "@/lib/auth"; 
 
 export async function POST(req: NextRequest) {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const session = await getServerSession(authOptions as any); 
-  // TODO: Fix authOptions import to avoid 'any' if possible. 
-  // However, getServerSession often requires the exact config object.
+  const session = await getServerSession(authOptions); 
   
   if (!session) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -19,16 +13,24 @@ export async function POST(req: NextRequest) {
   try {
     const formData = await req.formData();
     const file = formData.get('file') as File;
-    // const isGroup = formData.get('isGroup') === 'true'; // Removed unused variable as per lint error
-    formData.get('isGroup'); // Consume it if needed, but it was unused.
+    const categoryNoRaw = formData.get('categoryNo');
 
     if (!file) {
       return NextResponse.json({ error: "No file received" }, { status: 400 });
     }
 
+    if (!categoryNoRaw) {
+      return NextResponse.json({ error: "Category number is required" }, { status: 400 });
+    }
+
+    const categoryNo = Number(categoryNoRaw);
+    if (isNaN(categoryNo)) {
+      return NextResponse.json({ error: "Invalid category number" }, { status: 400 });
+    }
+
     const buffer = Buffer.from(await file.arrayBuffer());
     
-    const result = await parseAndSaveExcel(buffer);
+    const result = await parseAndSaveExcel(buffer, categoryNo);
 
     return NextResponse.json({ message: "File processed successfully", data: result });
   } catch (error: unknown) {

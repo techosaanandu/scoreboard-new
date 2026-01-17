@@ -14,6 +14,7 @@ export default function AdminDashboard() {
   const { status } = useSession();
   const router = useRouter();
   const [file, setFile] = useState<File | null>(null);
+  const [categoryNo, setCategoryNo] = useState<string>('');
   const [uploading, setUploading] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
   
@@ -32,13 +33,14 @@ export default function AdminDashboard() {
   };
 
   const handleUpload = async () => {
-    if (!file) return;
+    if (!file || !categoryNo) return;
 
     setUploading(true);
     setMessage(null);
 
     const formData = new FormData();
     formData.append('file', file);
+    formData.append('categoryNo', categoryNo);
 
     try {
       const res = await fetch('/api/upload', {
@@ -52,8 +54,12 @@ export default function AdminDashboard() {
         throw new Error(data.error || 'Upload failed');
       }
 
-      setMessage({ type: 'success', text: `Success! Processed ${data.data.count} results across ${data.data.events.length} events: ${data.data.events.join(", ")}` });
-      setFile(null); // Reset file input
+      setMessage({ 
+        type: 'success', 
+        text: `Success! Processed ${data.data.count} results for Category ${categoryNo} across ${data.data.events.length} events.` 
+      });
+      setFile(null);
+      setCategoryNo('');
     } catch (err: unknown) {
       setMessage({ type: 'error', text: err instanceof Error ? err.message : 'Upload failed' });
     } finally {
@@ -73,21 +79,31 @@ export default function AdminDashboard() {
               Upload Results
             </CardTitle>
             <CardDescription>
-              Upload the Excel result sheet. This will REPLACE existing results for the Event & Category found in the file.
+              Upload Excel sheet. Matches on Event Name + Category Number. If the Category Number is new, it adds the data. If it exists, it replaces it.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="grid w-full max-w-sm items-center gap-1.5">
+            <div className="grid w-full items-center gap-1.5">
               <Label htmlFor="picture">Result Sheet (Excel)</Label>
-              <div className="flex gap-2">
-                <Input 
-                    id="picture" 
-                    type="file" 
-                    accept=".xlsx, .xls"
-                    onChange={handleFileChange}
-                    disabled={uploading}
-                />
-              </div>
+              <Input 
+                  id="picture" 
+                  type="file" 
+                  accept=".xlsx, .xls"
+                  onChange={handleFileChange}
+                  disabled={uploading}
+              />
+            </div>
+
+            <div className="grid w-full items-center gap-1.5">
+              <Label htmlFor="categoryNo">Category Number</Label>
+              <Input 
+                  id="categoryNo" 
+                  type="number" 
+                  placeholder="e.g. 1, 2, 3"
+                  value={categoryNo}
+                  onChange={(e) => setCategoryNo(e.target.value)}
+                  disabled={uploading}
+              />
             </div>
 
             {file && (
@@ -99,7 +115,7 @@ export default function AdminDashboard() {
 
             <Button 
                 onClick={handleUpload} 
-                disabled={!file || uploading} 
+                disabled={!file || !categoryNo || uploading} 
                 className="w-full"
             >
               {uploading ? (
@@ -126,15 +142,21 @@ export default function AdminDashboard() {
 
         <Card>
             <CardHeader>
-                <CardTitle>Instructions</CardTitle>
+                <CardTitle>Data Logic</CardTitle>
             </CardHeader>
-            <CardContent className="text-sm space-y-2 text-muted-foreground">
-                <p>1. Ensure headers: Sl.No, Chest No., Name of the Student, CLASS, School, Grade / Mark, Place.</p>
-                <p>2. <strong>Multi-Sheet:</strong> Parses all sheets (e.g., 101, 102). Event Name & Category read from top rows.</p>
-                <div className="mt-2 text-xs bg-muted p-2 rounded">
-                    <strong>Auto-Detection:</strong> Group events are automatically identified by keywords (e.g., &apos;Group&apos;, &apos;Oppana&apos;, &apos;Duff&apos;) in the Event Name.<br/>
-                    <strong>Individual Rules:</strong> 1st=5, 2nd=3, 3rd=1. Grades: A=+5, B=+3, C=+1.<br/>
-                    <strong>Group Rules:</strong> 1st=10, 2nd=6, 3rd=2. Grades: A=+10, B=+6, C=+2.
+            <CardContent className="text-sm space-y-4 text-muted-foreground">
+                <div className="bg-blue-50 dark:bg-blue-900/20 p-3 rounded-md border border-blue-200 dark:border-blue-800">
+                    <p className="font-bold text-blue-800 dark:text-blue-300 mb-1">Upload Behavior:</p>
+                    <ul className="list-disc ml-4 space-y-1">
+                        <li>System checks <strong>Event Name</strong> (from Excel) + <strong>Category Number</strong> (from input).</li>
+                        <li>If this specific combination exists, it is <strong>replaced</strong>.</li>
+                        <li>If the Category Number is different, the data is <strong>added</strong> as a new set of results.</li>
+                    </ul>
+                </div>
+                <div className="text-xs bg-muted p-2 rounded">
+                    <strong>Points System:</strong><br/>
+                    Individual: 1st=5, 2nd=3, 3rd=1 | Grade A=5, B=3, C=1<br/>
+                    Group: 1st=10, 2nd=6, 3rd=2 | Grade A=10, B=6, C=2
                 </div>
             </CardContent>
         </Card>

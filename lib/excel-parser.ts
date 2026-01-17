@@ -2,7 +2,7 @@ import * as XLSX from 'xlsx';
 import Result from '@/models/Result';
 import dbConnect from '@/lib/mongodb';
 
-export async function parseAndSaveExcel(buffer: Buffer) {
+export async function parseAndSaveExcel(buffer: Buffer, categoryNo: number) {
   await dbConnect();
 
   const workbook = XLSX.read(buffer, { type: 'buffer' });
@@ -23,14 +23,6 @@ export async function parseAndSaveExcel(buffer: Buffer) {
     const eventName = eventRaw.replace(/^EVENT\s*:\s*/i, '').trim();
     if (!eventName) continue;
 
-    let category = "General";
-    const catLabelIndex = eventRow.findIndex((c) => typeof c === 'string' && c.trim().toLowerCase().includes('category'));
-    if (catLabelIndex !== -1 && eventRow.length > catLabelIndex + 1) {
-      const catVal = String(eventRow[catLabelIndex + 1]).trim();
-      if (catVal.length > 1) category = catVal; 
-    }
-
-    // Fixed Header Detection to satisfy prefer-const
     let detectedNameIdx = 2;
     let detectedSchoolIdx = 4;
     let detectedGradeIdx = 5;
@@ -68,10 +60,8 @@ export async function parseAndSaveExcel(buffer: Buffer) {
       if (!studentName || studentName.toLowerCase().includes('name of')) continue;
 
       const school = colMap.school !== -1 ? String(row[colMap.school] || '').trim() : '';
-      
       const rawGrade = String(row[colMap.grade] || '').trim().toUpperCase();
       let grade = rawGrade === '1' ? 'A' : rawGrade;
-
       const rawPlace = String(row[colMap.place] || '').trim().toLowerCase().replace(/^-/, '');
       let place = "";
 
@@ -99,7 +89,7 @@ export async function parseAndSaveExcel(buffer: Buffer) {
       resultsToSave.push({
         eventCode: sheetName,
         eventName,
-        category,
+        category: categoryNo,
         studentName,
         school,
         grade: grade || 'A',
@@ -109,7 +99,7 @@ export async function parseAndSaveExcel(buffer: Buffer) {
     }
 
     if (resultsToSave.length > 0) {
-      await Result.deleteMany({ eventName, category }); 
+      await Result.deleteMany({ eventName, category: categoryNo }); 
       await Result.insertMany(resultsToSave);
       totalProcessed += resultsToSave.length;
       eventsProcessed.push(eventName);
