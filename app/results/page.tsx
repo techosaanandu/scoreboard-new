@@ -121,7 +121,7 @@ export default function ResultsPage() {
                                         <TableCell>
                                             <div className="flex flex-col">
                                                 <span className="font-semibold">{r.eventName}</span>
-                                                <span className="text-xs text-amber-600">{r.category}</span>
+                                                
                                             </div>
                                         </TableCell>
                                         <TableCell className="text-center font-bold text-xl">{r.grade || '-'}</TableCell>
