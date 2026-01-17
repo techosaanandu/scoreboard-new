@@ -1,15 +1,12 @@
 "use client";
 
 import { useEffect, useState, useRef } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Trophy, Medal, Star } from 'lucide-react';
+import { Trophy, Medal } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
-// Dummy data for initial view or if fetch fails
-const INITIAL_DATA = [
-  { rank: 1, school: "Loading...", points: 0 },
-];
+
 
 export function LeaderboardTable() {
     const [data, setData] = useState<{rank:number, school:string, points:number}[]>([]);

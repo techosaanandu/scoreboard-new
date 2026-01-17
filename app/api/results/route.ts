@@ -11,7 +11,7 @@ export async function GET(req: NextRequest) {
     
     await dbConnect();
 
-    let query: any = {};
+    let query: Record<string, unknown> = {};
     if (q) {
       const regex = new RegExp(q, 'i');
       query = {
@@ -30,7 +30,7 @@ export async function GET(req: NextRequest) {
     const data = await Result.find(query).sort({ updatedAt: -1 }).limit(100);
 
     return NextResponse.json({ data });
-  } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+  } catch (error: unknown) {
+    return NextResponse.json({ error: error instanceof Error ? error.message : 'Internal Server Error' }, { status: 500 });
   }
 }

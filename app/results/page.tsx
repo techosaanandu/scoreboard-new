@@ -1,15 +1,22 @@
 "use client";
 
 import { useEffect, useState, useRef } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Search, Filter, Loader2 } from 'lucide-react';
+import { Search } from 'lucide-react';
 
 export default function ResultsPage() {
     const [searchTerm, setSearchTerm] = useState('');
-    const [results, setResults] = useState<any[]>([]);
+    const [results, setResults] = useState<{
+        _id: string;
+        studentName: string;
+        school: string;
+        eventName: string;
+        category: string;
+        grade: string;
+        place: string;
+    }[]>([]);
     const [loading, setLoading] = useState(false);
     const [debouncedSearch, setDebouncedSearch] = useState('');
     const scrollRef = useRef<HTMLDivElement>(null);
@@ -102,7 +109,7 @@ export default function ResultsPage() {
                             placeholder="Find Student, School or ID..."
                             className="pl-8 bg-white/50 dark:bg-slate-900/50 backdrop-blur-sm border-blue-200 dark:border-blue-800 focus-visible:ring-blue-500"
                             value={searchTerm}
-                            onChange={(e) => setSearchTerm(e.target.value)}
+                            onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSearchTerm(e.target.value)}
                         />
                     </div>
                     {/* <Button onClick={() => fetchResults(searchTerm)} disabled={loading} className="bg-blue-600 hover:bg-blue-700 text-white">
@@ -145,7 +152,15 @@ export default function ResultsPage() {
                                         </TableCell>
                                     </TableRow>
                                 ) : (
-                                    results.map((r: any, index: number) => (
+                                    results.map((r: {
+                                        _id: string;
+                                        studentName: string;
+                                        school: string;
+                                        eventName: string;
+                                        category: string;
+                                        grade: string;
+                                        place: string;
+                                    }, index: number) => (
                                         <TableRow key={r._id} className={`
                                             transition-colors border-b border-gray-100 dark:border-gray-800
                                             hover:bg-blue-50/50 dark:hover:bg-blue-900/20

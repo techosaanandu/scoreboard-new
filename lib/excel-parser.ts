@@ -2,15 +2,7 @@ import * as XLSX from 'xlsx';
 import Result from '@/models/Result';
 import dbConnect from '@/lib/mongodb';
 
-interface ParsedResult {
-  slNo: number;
-  chestNo: string;
-  name: string;
-  class: string;
-  school: string;
-  grade: string;
-  place: string;
-}
+
 
 export async function parseAndSaveExcel(buffer: Buffer) {
   await dbConnect();
@@ -19,14 +11,14 @@ export async function parseAndSaveExcel(buffer: Buffer) {
   const sheetNames = workbook.SheetNames;
   
   let totalProcessed = 0;
-  let eventsProcessed: string[] = [];
+  const eventsProcessed: string[] = [];
 
   const GROUP_KEYWORDS = ["GROUP"];
 
   for (const sheetName of sheetNames) {
       // Skip empty or utility sheets if any, though "101", "102" are valid
       const worksheet = workbook.Sheets[sheetName];
-      const rows = XLSX.utils.sheet_to_json(worksheet, { header: 1, defval: '' }) as any[][];
+      const rows = XLSX.utils.sheet_to_json(worksheet, { header: 1, defval: '' }) as (string | number)[][];
 
       if (rows.length < 5) {
           console.log(`Skipping sheet ${sheetName}: Too few rows`);
@@ -37,8 +29,8 @@ export async function parseAndSaveExcel(buffer: Buffer) {
       const codeRow = rows[3];
       
       // Extract Event Name
-      let eventRaw = (eventRow[0] as string) || "";
-      let eventName = eventRaw.replace(/^EVENT\s*:\s*/i, '').trim();
+      const eventRaw = (eventRow[0] as string) || "";
+      const eventName = eventRaw.replace(/^EVENT\s*:\s*/i, '').trim();
 
       if (!eventName) {
          // Try to find event name in other cells of row 2?
@@ -50,13 +42,13 @@ export async function parseAndSaveExcel(buffer: Buffer) {
 
       // Extract Category
       let category = "Unknown";
-      const catLabelIndex = eventRow.findIndex((c: any) => typeof c === 'string' && c.trim().toLowerCase() === 'category:');
+      const catLabelIndex = eventRow.findIndex((c) => typeof c === 'string' && c.trim().toLowerCase() === 'category:');
       if (catLabelIndex !== -1 && eventRow.length > catLabelIndex + 1) {
           category = String(eventRow[catLabelIndex + 1]).trim();
       }
 
       // Extract Event Code
-      let codeRaw = (codeRow[0] as string) || "";
+      const codeRaw = (codeRow[0] as string) || "";
       let eventCode = codeRaw.replace(/^EVENT CODE\s*:\s*/i, '').trim();
       // If code missing from cell, use sheet name if numeric?
       if (!eventCode && /^\d+$/.test(sheetName)) {

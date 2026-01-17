@@ -1,7 +1,4 @@
-import Link from 'next/link';
 import { LeaderboardTable } from '@/components/leaderboard-table';
-import { Button } from '@/components/ui/button';
-import { ArrowRight, LayoutDashboard, Search } from 'lucide-react';
 
 export default function Home() {
   return (

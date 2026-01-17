@@ -7,9 +7,10 @@ import { GET as authOptions } from "@/app/api/auth/[...nextauth]/route";
 // Next.js App Router handles requests differently. We read formData.
 
 export async function POST(req: NextRequest) {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const session = await getServerSession(authOptions as any); 
-  // Note: We might need to import authOptions differently or pass config.
-  // For now, simple check. To fix strictly: export authOptions from route.ts properly.
+  // TODO: Fix authOptions import to avoid 'any' if possible. 
+  // However, getServerSession often requires the exact config object.
   
   if (!session) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -18,7 +19,8 @@ export async function POST(req: NextRequest) {
   try {
     const formData = await req.formData();
     const file = formData.get('file') as File;
-    const isGroup = formData.get('isGroup') === 'true';
+    // const isGroup = formData.get('isGroup') === 'true'; // Removed unused variable as per lint error
+    formData.get('isGroup'); // Consume it if needed, but it was unused.
 
     if (!file) {
       return NextResponse.json({ error: "No file received" }, { status: 400 });
@@ -29,8 +31,8 @@ export async function POST(req: NextRequest) {
     const result = await parseAndSaveExcel(buffer);
 
     return NextResponse.json({ message: "File processed successfully", data: result });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Upload error:", error);
-    return NextResponse.json({ error: error.message || "Processing failed" }, { status: 500 });
+    return NextResponse.json({ error: error instanceof Error ? error.message : "Processing failed" }, { status: 500 });
   }
 }

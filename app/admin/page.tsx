@@ -11,7 +11,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Upload, FileSpreadsheet, CheckCircle, AlertCircle, Loader2 } from 'lucide-react';
 
 export default function AdminDashboard() {
-  const { data: session, status } = useSession();
+  const { status } = useSession();
   const router = useRouter();
   const [file, setFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
@@ -54,8 +54,8 @@ export default function AdminDashboard() {
 
       setMessage({ type: 'success', text: `Success! Processed ${data.data.count} results across ${data.data.events.length} events: ${data.data.events.join(", ")}` });
       setFile(null); // Reset file input
-    } catch (err: any) {
-      setMessage({ type: 'error', text: err.message });
+    } catch (err: unknown) {
+      setMessage({ type: 'error', text: err instanceof Error ? err.message : 'Upload failed' });
     } finally {
       setUploading(false);
     }
@@ -132,7 +132,7 @@ export default function AdminDashboard() {
                 <p>1. Ensure headers: Sl.No, Chest No., Name of the Student, CLASS, School, Grade / Mark, Place.</p>
                 <p>2. <strong>Multi-Sheet:</strong> Parses all sheets (e.g., 101, 102). Event Name & Category read from top rows.</p>
                 <div className="mt-2 text-xs bg-muted p-2 rounded">
-                    <strong>Auto-Detection:</strong> Group events are automatically identified by keywords (e.g., 'Group', 'Oppana', 'Duff') in the Event Name.<br/>
+                    <strong>Auto-Detection:</strong> Group events are automatically identified by keywords (e.g., &apos;Group&apos;, &apos;Oppana&apos;, &apos;Duff&apos;) in the Event Name.<br/>
                     <strong>Individual Rules:</strong> 1st=5, 2nd=3, 3rd=1. Grades: A=+5, B=+3, C=+1.<br/>
                     <strong>Group Rules:</strong> 1st=10, 2nd=6, 3rd=2. Grades: A=+10, B=+6, C=+2.
                 </div>

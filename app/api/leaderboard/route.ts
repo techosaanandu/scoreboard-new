@@ -22,8 +22,7 @@ export async function GET() {
     ]);
 
     // Add rank
-    let currentRank = 1;
-    let data = aggregation.map((item, index) => {
+    const data = aggregation.map((item, index) => {
        // Handle ties logic if needed, for MVP simple sequential rank:
        const rank = index + 1;
        return {
@@ -34,7 +33,7 @@ export async function GET() {
     });
 
     return NextResponse.json({ data });
-  } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+  } catch (error: unknown) {
+    return NextResponse.json({ error: error instanceof Error ? error.message : 'Internal Server Error' }, { status: 500 });
   }
 }
