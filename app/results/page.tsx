@@ -92,7 +92,7 @@ export default function ResultsPage() {
         <div className="container py-6 h-[calc(100vh-4rem)] flex flex-col">
             <div className="flex flex-col md:flex-row items-center justify-between mb-6 gap-4 shrink-0">
                 <h1 className="text-3xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-violet-600 dark:from-blue-400 dark:to-violet-400">
-                    Individual Results
+                    
                 </h1>
                 
                 <div className="flex w-full md:w-auto gap-2">
